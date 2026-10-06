@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi Emulator Android 9 Pie</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Roboto) -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            user-select: none;
+        }
+
+        /* Smartphone Body & Screen Mockup */
+        .phone-case {
+            width: 360px;
+            height: 720px;
+            background: #111827;
+            border-radius: 44px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7),
+                        0 0 0 12px #1f2937,
+                        0 0 0 15px #374151,
+                        inset 0 0 10px rgba(0,0,0,0.8);
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #4b5563;
+        }
+
+        /* Camera Notch */
+        .phone-notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 140px;
+            height: 26px;
+            background-color: #1f2937;
+            border-bottom-left-radius: 18px;
+            border-bottom-right-radius: 18px;
+            z-index: 50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .camera-lens {
+            width: 10px;
+            height: 10px;
+            background-color: #030712;
+            border-radius: 50%;
+            border: 1px solid #374151;
+            position: relative;
+        }
+        .camera-lens::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 3px;
+            height: 3px;
+            background: #3b82f6;
+            border-radius: 50%;
+            opacity: 0.6;
+        }
+
+        .speaker-grille {
+            width: 45px;
+            height: 4px;
+            background-color: #374151;
+            border-radius: 2px;
+        }
+
+        /* Power Physical Button */
+        .power-btn {
+            position: absolute;
+            right: -18px;
+            top: 140px;
+            width: 6px;
+            height: 50px;
+            background: linear-gradient(to right, #4b5563, #1f2937);
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+        }
+        .power-btn:active {
+            transform: translateX(-2px);
+        }
+
+        /* Android Pie Boot Glow Effect */
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; filter: drop-shadow(0 0 15px #3b82f6); }
+        }
+
+        .boot-logo-anim {
+            animation: pulseGlow 2.5s infinite ease-in-out;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+
+        /* Key Mapping Overlay Badge Styling */
+        .key-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: rgba(234, 179, 8, 0.9);
+            color: #000;
+            font-weight: 800;
+            font-size: 10px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ffffff;
+            box-shadow: 0 0 6px rgba(234, 179, 8, 0.8);
+            z-index: 20;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="flex flex-col lg:flex-row items-center justify-center gap-8 max-w-5xl w-full">
+        
+        <!-- Left Side: Interactive Smartphone Container -->
+        <div class="relative">
+            <!-- Physical Power Button -->
+            <div id="powerButton" class="power-btn" title="Klik Tombol Power untuk Boot / Reset"></div>
+
+            <!-- Phone Frame -->
+            <div class="phone-case flex flex-col justify-between bg-black text-white select-none">
+                
+                <!-- Notch Header -->
+                <div class="phone-notch">
+                    <div class="camera-lens"></div>
+                    <div class="speaker-grille"></div>
+                </div>
+
+                <!-- Android Status Bar -->
+                <div id="statusBar" class="h-7 pt-1 px-5 flex justify-between items-center text-xs text-white z-40 bg-transparent font-medium">
+                    <div id="statusTime" class="font-semibold text-xs ml-1">10:20</div>
+                    <div class="flex items-center gap-2 text-[10px]">
+                        <i id="statusWifi" class="fas fa-wifi"></i>
+                        <i class="fas fa-signal"></i>
+                        <div class="flex items-center gap-0.5">
+                            <span class="text-[9px]">95%</span>
+                            <i class="fas fa-battery-three-quarters text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phone Screen Container -->
+                <div id="phoneScreen" class="relative flex-1 w-full bg-slate-900 overflow-hidden flex flex-col">
+
+                    <!-- Key Mapping Transparent Overlay Indicator -->
+                    <div id="keyMapOverlay" class="absolute top-2 left-2 bg-yellow-500/20 border border-yellow-400 text-yellow-300 text-[9px] font-bold px-2 py-0.5 rounded-full z-40 hidden backdrop-blur-xs flex items-center gap-1">
+                        <i class="fas fa-keyboard"></i> KEYMAP ACTIVE
+                    </div>
+
+                    <!-- ================= 1. STATE: POWER OFF ================= -->
+                    <div id="screenOff" class="absolute inset-0 bg-black flex flex-col items-center justify-center z-30">
+                        <div class="text-gray-600 text-center px-6">
+                            <i class="fas fa-power-off text-4xl mb-3 opacity-40"></i>
+                            <p class="text-sm">Ponsel Dimatikan.</p>
+                            <p class="text-xs text-gray-500 mt-1">Tekan tombol <span class="text-blue-400 font-semibold">POWER</span> di samping kanan untuk menyalakan.</p>
+                        </div>
+                    </div>
+
+                    <!-- ================= 2. STATE: BOOTING SCREEN ================= -->
+                    <div id="screenBooting" class="absolute inset-0 bg-black flex flex-col justify-between p-6 z-20 hidden">
+                        <div class="flex-1 flex flex-col items-center justify-center">
+                            <!-- Android 9 Pie Logo -->
+                            <div class="w-24 h-24 mb-6 relative flex items-center justify-center">
+                                <div class="absolute inset-0 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin"></div>
+                                <div class="boot-logo-anim text-center">
+                                    <span class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-tr from-blue-400 to-emerald-400">P</span>
+                                </div>
+                            </div>
+                            <h2 class="text-lg font-bold tracking-widest text-slate-200">ANDROID 9</h2>
+                            <p class="text-xs text-blue-400 mt-1 font-mono">Emulating ART & Kernel 4.19...</p>
+
+                            <!-- Progress Bar -->
+                            <div class="w-4/5 bg-gray-800 rounded-full h-1.5 mt-6 overflow-hidden">
+                                <div id="bootProgress" class="bg-gradient-to-r from-blue-500 to-teal-400 h-1.5 rounded-full w-0 transition-all duration-300"></div>
+                            </div>
+                        </div>
+
+                        <!-- Mini Hardware Log inside Boot Screen -->
+                        <div class="h-24 bg-gray-950/80 rounded-lg p-2 font-mono text-[10px] text-emerald-400 overflow-y-auto border border-gray-800" id="bootLogs">
+                            <div>[BOOT] Inisialisasi CPU Virtual...</div>
+                        </div>
+                    </div>
+
+                    <!-- ================= 3. STATE: HOME SCREEN ================= -->
+                    <div id="screenHome" class="absolute inset-0 bg-gradient-to-b from-indigo-900 via-slate-900 to-gray-950 p-4 flex flex-col justify-between z-10 hidden overflow-y-auto">
+                        <!-- Home Widget -->
+                        <div class="mt-8 text-center">
+                            <h1 id="widgetTime" class="text-5xl font-light text-white tracking-tight">10:20</h1>
+                            <p id="widgetDate" class="text-xs text-slate-300 font-medium mt-1">Selasa, 6 Oktober</p>
+                            
+                            <!-- Search Bar Widget Google (Interactive Input) -->
+                            <div class="mt-6 mx-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 flex items-center gap-3 border border-white/10 shadow-lg">
+                                <i class="fab fa-google text-slate-300 text-sm"></i>
+                                <input id="googleSearchInput" type="text" placeholder="Cari di sini..." autocomplete="off" onkeydown="handleGoogleSearchKeyDown(event)" class="bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none flex-1">
+                                <button onclick="executeGoogleSearch()" class="focus:outline-none flex items-center">
+                                    <i class="fas fa-search text-slate-300 text-xs hover:text-white transition"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- App Icons Grid -->
+                        <div id="homeAppGrid" class="grid grid-cols-3 gap-4 my-auto px-2 py-4">
+                            <!-- App: Calculator -->
+                            <button onclick="openApp('appCalculator')" class="relative flex flex-col items-center gap-1.5 group focus:outline-none">
+                                <span class="key-badge keymap-badge hidden">K</span>
+                                <div class="w-14 h-14 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg group-active:scale-95 transition-transform">
+                                    <i class="fas fa-calculator text-2xl text-white"></i>
+                                </div>
+                                <span class="text-[11px] text-white font-medium drop-shadow">Kalkulator</span>
+                            </button>
+
+                            <!-- App: Settings -->
+                            <button onclick="openApp('appSettings')" class="relative flex flex-col items-center gap-1.5 group focus:outline-none">
+                                <span class="key-badge keymap-badge hidden">S</span>
+                                <div class="w-14 h-14 bg-slate-600 rounded-2xl flex items-center justify-center shadow-lg group-active:scale-95 transition-transform">
+                                    <i class="fas fa-cog text-2xl text-white"></i>
+                                </div>
+                                <span class="text-[11px] text-white font-medium drop-shadow">Pengaturan</span>
+                            </button>
+
+                            <!-- App: Notes -->
+                            <button onclick="openApp('appNotes')" class="relative flex flex-col items-center gap-1.5 group focus:outline-none">
+                                <span class="key-badge keymap-badge hidden">N</span>
+                                <div class="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-lg group-active:scale-95 transition-transform">
+                                    <i class="fas fa-sticky-note text-2xl text-white"></i>
+                                </div>
+                                <span class="text-[11px] text-white font-medium drop-shadow">Catatan</span>
+                            </button>
+
+                            <!-- App: YouTube -->
+                            <button onclick="openApp('appYoutube')" class="relative flex flex-col items-center gap-1.5 group focus:outline-none">
+                                <span class="key-badge keymap-badge hidden">Y</span>
+                                <div class="w-14 h-14 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg group-active:scale-95 transition-transform">
+                                    <i class="fab fa-youtube text-2xl text-white"></i>
+                                </div>
+                                <span class="text-[11px] text-white font-medium drop-shadow">YouTube</span>
+                            </button>
+
+                            <!-- App: Google Play Store -->
+                            <button onclick="openApp('appPlaystore')" class="relative flex flex-col items-center gap-1.5 group focus:outline-none">
+                                <span class="key-badge keymap-badge hidden">P</span>
+                                <div class="w-14 h-14 bg-gradient-to-tr from-blue-500 via-teal-400 to-green-400 rounded-2xl flex items-center justify-center shadow-lg group-active:scale-95 transition-transform">
+                                    <i class="fab fa-google-play text-2xl text-white"></i>
+                                </div>
+                                <span class="text-[11px] text-white font-medium drop-shadow">Play Store</span>
+                            </button>
+                        </div>
+
+                        <!-- Dock Icons Mockup -->
+                        <div class="bg-white/10 backdrop-blur-md rounded-3xl p-2.5 flex justify-around items-center mb-1 border border-white/5">
+                            <button onclick="alert('Membuka Telepon...')" class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center active:scale-90 transition-transform"><i class="fas fa-phone text-white text-sm"></i></button>
+                            <button onclick="alert('Membuka Pesan...')" class="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center active:scale-90 transition-transform"><i class="fas fa-comment text-white text-sm"></i></button>
+                            <button onclick="openApp('appYoutube')" class="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center active:scale-90 transition-transform"><i class="fab fa-youtube text-white text-sm"></i></button>
+                            <button onclick="alert('Membuka Kamera...')" class="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center active:scale-90 transition-transform"><i class="fas fa-camera text-white text-sm"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- ================= 4. APP: CALCULATOR ================= -->
+                    <div id="appCalculator" class="absolute inset-0 bg-slate-900 flex flex-col z-15 hidden">
+                        <div class="bg-slate-800 p-3 text-sm font-semibold flex justify-between items-center border-b border-slate-700">
+                            <span class="flex items-center gap-2"><i class="fas fa-calculator text-amber-500"></i> Kalkulator</span>
+                            <span class="text-xs text-slate-400">Android 9</span>
+                        </div>
+                        
+                        <div class="p-4 bg-slate-950 flex-1 flex flex-col justify-end text-right">
+                            <div id="calcExpr" class="text-slate-400 text-xs h-5 font-mono overflow-x-auto"></div>
+                            <div id="calcDisplay" class="text-white text-3xl font-bold font-mono tracking-wider overflow-x-auto">0</div>
+                        </div>
+
+                        <div class="grid grid-cols-4 gap-2 p-3 bg-slate-900 border-t border-slate-800">
+                            <button onclick="calcClearAll()" class="p-3 bg-rose-600/30 text-rose-400 font-bold rounded-xl active:bg-rose-600 active:text-white transition">AC</button>
+                            <button onclick="calcInput('%')" class="p-3 bg-amber-500/20 text-amber-400 font-bold rounded-xl active:bg-amber-500 active:text-white transition">%</button>
+                            <button onclick="calcInput('/')" class="p-3 bg-amber-500/20 text-amber-400 font-bold rounded-xl active:bg-amber-500 active:text-white transition">÷</button>
+                            <button onclick="calcBackspace()" class="p-3 bg-slate-800 text-slate-300 font-bold rounded-xl active:bg-slate-700 transition"><i class="fas fa-backspace"></i></button>
+
+                            <button onclick="calcInput('7')" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">7</button>
+                            <button onclick="calcInput('8')" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">8</button>
+                            <button onclick="calcInput('9')" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">9</button>
+                            <button onclick="calcInput('*')" class="p-3 bg-amber-500/20 text-amber-400 font-bold rounded-xl active:bg-amber-500 active:text-white transition">×</button>
+
+                            <button onclick="calcInput('4')" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">4</button>
+                            <button onclick="calcInput('5')" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">5</button>
+                            <button onclick="calcInput('6')" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">6</button>
+                            <button onclick="calcInput('-')" class="p-3 bg-amber-500/20 text-amber-400 font-bold rounded-xl active:bg-amber-500 active:text-white transition">-</button>
+
+                            <button onclick="calcInput('1')" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">1</button>
+                            <button onclick="calcInput('2')" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">2</button>
+                            <button onclick="calcInput('3')" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">3</button>
+                            <button onclick="calcInput('+')" class="p-3 bg-amber-500/20 text-amber-400 font-bold rounded-xl active:bg-amber-500 active:text-white transition">+</button>
+
+                            <button onclick="calcToggleSign()" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">±</button>
+                            <button onclick="calcInput('0')" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">0</button>
+                            <button onclick="calcInput('.')" class="p-3 bg-slate-800 text-white font-semibold rounded-xl active:bg-slate-700 transition">.</button>
+                            <button onclick="calcEquals()" class="p-3 bg-amber-500 text-slate-950 font-bold text-xl rounded-xl active:bg-amber-400 flex items-center justify-center shadow-lg transition">=</button>
+                        </div>
+                    </div>
+
+                    <!-- ================= 5. APP: SETTINGS ================= -->
+                    <div id="appSettings" class="absolute inset-0 bg-slate-900 flex flex-col z-15 hidden overflow-y-auto">
+                        <div class="bg-slate-800 p-3 text-sm font-semibold flex justify-between items-center border-b border-slate-700 sticky top-0 z-10">
+                            <span class="flex items-center gap-2"><i class="fas fa-cog text-slate-400"></i> Pengaturan</span>
+                            <span class="text-xs text-slate-400">Android 9</span>
+                        </div>
+                        
+                        <div class="p-4 space-y-4">
+                            <div class="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
+                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Jaringan & Koneksi</h4>
+                                <div class="flex justify-between items-center mb-3">
+                                    <div class="flex items-center gap-3">
+                                        <i class="fas fa-wifi text-blue-400 w-5 text-center"></i>
+                                        <div>
+                                            <p class="text-xs font-medium text-white">Wi-Fi</p>
+                                            <p id="wifiStatusText" class="text-[10px] text-slate-400">Terhubung ke Virtual_Net</p>
+                                        </div>
+                                    </div>
+                                    <input type="checkbox" id="toggleWifi" checked onchange="handleWifiToggle(this)" class="w-4 h-4 accent-blue-500 cursor-pointer">
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <i class="fab fa-bluetooth-b text-indigo-400 w-5 text-center"></i>
+                                        <div>
+                                            <p class="text-xs font-medium text-white">Bluetooth</p>
+                                            <p id="btStatusText" class="text-[10px] text-slate-400">Mati</p>
+                                        </div>
+                                    </div>
+                                    <input type="checkbox" id="toggleBt" onchange="handleBtToggle(this)" class="w-4 h-4 accent-blue-500 cursor-pointer">
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
+                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Tampilan</h4>
+                                <div class="mb-3">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-xs font-medium text-white flex items-center gap-2"><i class="fas fa-sun text-amber-400"></i> Kecerahan Layar</span>
+                                        <span id="brightnessValText" class="text-xs text-slate-400">100%</span>
+                                    </div>
+                                    <input type="range" id="brightnessSlider" min="30" max="100" value="100" oninput="changeBrightness(this.value)" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
+                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tentang Perangkat</h4>
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex justify-between py-1 border-b border-slate-700/40">
+                                        <span class="text-slate-400">Nama Perangkat</span>
+                                        <span class="text-white font-medium">Android 9 Emulator</span>
+                                    </div>
+                                    <div class="flex justify-between py-1 border-b border-slate-700/40">
+                                        <span class="text-slate-400">Versi Android</span>
+                                        <span class="text-white font-medium">9.0 (Pie)</span>
+                                    </div>
+                                    <div class="flex justify-between py-1 border-b border-slate-700/40">
+                                        <span class="text-slate-400">RAM Virtual</span>
+                                        <span class="text-white font-medium">4.0 GB</span>
+                                    </div>
+                                    <div class="flex justify-between py-1">
+                                        <span class="text-slate-400">Kernel Version</span>
+                                        <span class="text-white font-medium">4.19.81-virtual</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ================= 6. APP: NOTES ================= -->
+                    <div id="appNotes" class="absolute inset-0 bg-slate-900 flex flex-col z-15 hidden">
+                        <div class="bg-slate-800 p-3 text-sm font-semibold flex justify-between items-center border-b border-slate-700">
+                            <span class="flex items-center gap-2"><i class="fas fa-sticky-note text-emerald-500"></i> Catatan</span>
+                            <span class="text-xs text-slate-400">Android 9</span>
+                        </div>
+                        <div class="p-4 flex-1 flex flex-col gap-3">
+                            <input id="noteTitle" type="text" placeholder="Judul Catatan..." class="bg-slate-800 text-sm text-white px-3 py-2 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-500">
+                            <textarea id="noteBody" placeholder="Tulis catatan di sini..." class="bg-slate-800 text-xs text-white p-3 rounded-lg border border-slate-700 flex-1 resize-none focus:outline-none focus:border-emerald-500"></textarea>
+                            
+                            <div class="flex items-center justify-between">
+                                <span id="noteStatus" class="text-[10px] text-emerald-400 font-medium"></span>
+                                <div class="flex gap-2">
+                                    <button onclick="clearNote()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium">Hapus</button>
+                                    <button onclick="saveNote()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded-lg text-xs font-medium shadow-lg">Simpan</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ================= 7. APP: YOUTUBE ================= -->
+                    <div id="appYoutube" class="absolute inset-0 bg-zinc-950 flex flex-col z-15 hidden">
+                        <div class="bg-zinc-900 p-2.5 flex items-center gap-2 border-b border-zinc-800">
+                            <i class="fab fa-youtube text-red-600 text-xl"></i>
+                            <input id="ytSearchInput" type="text" placeholder="Masukkan ID Video / URL..." class="flex-1 bg-zinc-800 text-xs text-white px-2.5 py-1.5 rounded-full focus:outline-none border border-zinc-700">
+                            <button onclick="putarVideoInputManual()" class="bg-red-600 px-3 py-1.5 rounded-full text-xs font-medium text-white hover:bg-red-500 transition">Putar</button>
+                        </div>
+
+                        <div class="w-full aspect-video bg-black relative flex items-center justify-center">
+                            <iframe id="ytIframe" class="w-full h-full" src="https://www.youtube.com/embed/dQw4w9WgXcQ?enablejsapi=1&origin=https://localhost&rel=0&hl=id" title="YouTube Video Player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                        </div>
+
+                        <div class="p-3 flex-1 overflow-y-auto">
+                            <p id="ytCurrentTitle" class="text-xs font-semibold text-zinc-200 mb-3 truncate">Memutar: Rick Astley - Never Gonna Give You Up</p>
+                            <p class="text-xs font-semibold text-zinc-400 mb-2">Pilihan Video Rekomendasi:</p>
+                            <div class="space-y-2">
+                                <button onclick="gantiVideoYouTube('aqz-KE-bpKQ', 'Big Buck Bunny (Animation)')" class="w-full bg-zinc-900 p-2 rounded-lg flex items-center gap-3 hover:bg-zinc-800 text-left border border-zinc-800/80 transition">
+                                    <div class="w-12 h-8 bg-zinc-800 rounded flex items-center justify-center text-red-500"><i class="fas fa-play text-xs"></i></div>
+                                    <div class="flex-1 overflow-hidden">
+                                        <p class="text-xs text-white font-medium truncate">Big Buck Bunny</p>
+                                        <p class="text-[10px] text-zinc-400">Sampel Video Animation</p>
+                                    </div>
+                                </button>
+
+                                <button onclick="gantiVideoYouTube('dQw4w9WgXcQ', 'Rick Astley - Never Gonna Give You Up')" class="w-full bg-zinc-900 p-2 rounded-lg flex items-center gap-3 hover:bg-zinc-800 text-left border border-zinc-800/80 transition">
+                                    <div class="w-12 h-8 bg-zinc-800 rounded flex items-center justify-center text-red-500"><i class="fas fa-play text-xs"></i></div>
+                                    <div class="flex-1 overflow-hidden">
+                                        <p class="text-xs text-white font-medium truncate">Rick Astley - Classic</p>
+                                        <p class="text-[10px] text-zinc-400">Musik Populer</p>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ================= 8. APP: GOOGLE PLAY STORE ================= -->
+                    <div id="appPlaystore" class="absolute inset-0 bg-slate-900 flex flex-col z-15 hidden overflow-y-auto">
+                        <div class="bg-slate-800 p-3 text-sm font-semibold flex justify-between items-center border-b border-slate-700 sticky top-0 z-10">
+                            <span class="flex items-center gap-2"><i class="fab fa-google-play text-teal-400"></i> Google Play Store</span>
+                            <span class="text-xs text-slate-400">Android 9</span>
+                        </div>
+
+                        <div class="p-3 space-y-3">
+                            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Aplikasi Populer</h3>
+
+                            <!-- App Item: Snake Game -->
+                            <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 flex items-center gap-3">
+                                <div class="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center text-white text-xl">
+                                    <i class="fas fa-staff-snake"></i>
+                                </div>
+                                <div class="flex-1 overflow-hidden">
+                                    <p class="text-xs font-bold text-white">Snake Game</p>
+                                    <p class="text-[10px] text-slate-400">Arcade • 12 MB</p>
+                                    <div id="progressSnake" class="w-full bg-slate-700 rounded-full h-1 mt-1.5 hidden overflow-hidden">
+                                        <div id="barSnake" class="bg-teal-400 h-1 w-0 transition-all duration-200"></div>
+                                    </div>
+                                </div>
+                                <button id="btnInstallSnake" onclick="installApp('snake', 'Snake Game', 'fa-staff-snake', 'bg-emerald-600', 128)" class="bg-teal-600 hover:bg-teal-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">Instal</button>
+                            </div>
+
+                            <!-- App Item: Flappy Bird -->
+                            <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 flex items-center gap-3">
+                                <div class="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center text-white text-xl">
+                                    <i class="fas fa-crow"></i>
+                                </div>
+                                <div class="flex-1 overflow-hidden">
+                                    <p class="text-xs font-bold text-white">Flappy Bird</p>
+                                    <p class="text-[10px] text-slate-400">Casual • 8 MB</p>
+                                    <div id="progressFlappy" class="w-full bg-slate-700 rounded-full h-1 mt-1.5 hidden overflow-hidden">
+                                        <div id="barFlappy" class="bg-teal-400 h-1 w-0 transition-all duration-200"></div>
+                                    </div>
+                                </div>
+                                <button id="btnInstallFlappy" onclick="installApp('flappy', 'Flappy Bird', 'fa-crow', 'bg-amber-500', 96)" class="bg-teal-600 hover:bg-teal-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">Instal</button>
+                            </div>
+
+                            <!-- App Item: Chrome Lite -->
+                            <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 flex items-center gap-3">
+                                <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xl">
+                                    <i class="fab fa-chrome"></i>
+                                </div>
+                                <div class="flex-1 overflow-hidden">
+                                    <p class="text-xs font-bold text-white">Chrome Lite</p>
+                                    <p class="text-[10px] text-slate-400">Browser • 24 MB</p>
+                                    <div id="progressChrome" class="w-full bg-slate-700 rounded-full h-1 mt-1.5 hidden overflow-hidden">
+                                        <div id="barChrome" class="bg-teal-400 h-1 w-0 transition-all duration-200"></div>
+                                    </div>
+                                </div>
+                                <button id="btnInstallChrome" onclick="installApp('chrome', 'Chrome Lite', 'fa-chrome', 'bg-blue-600', 210)" class="bg-teal-600 hover:bg-teal-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">Instal</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ================= 9. GENERIC INSTALLED APP VIEW ================= -->
+                    <div id="appGeneric" class="absolute inset-0 bg-slate-900 flex flex-col z-15 hidden">
+                        <div class="bg-slate-800 p-3 text-sm font-semibold flex justify-between items-center border-b border-slate-700">
+                            <span id="genericAppTitle" class="flex items-center gap-2 text-white">Aplikasi</span>
+                            <span class="text-xs text-slate-400">Android 9</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                            <div id="genericAppIcon" class="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl text-white shadow-2xl mb-4">
+                                <i class="fas fa-cubes"></i>
+                            </div>
+                            <h2 id="genericAppName" class="text-lg font-bold text-white mb-1">Aplikasi Virtual</h2>
+                            <p class="text-xs text-slate-400 max-w-xs leading-relaxed mb-6">Aplikasi ini berhasil dipasang via Play Store dan berjalan dalam ruang memori emulator.</p>
+                            <button onclick="navHome()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-xs font-medium shadow-lg transition">Kembali ke Home</button>
+                        </div>
+                    </div>
+
+                    <!-- ================= 10. STATE: RECENT APPS OVERVIEW ================= -->
+                    <div id="screenRecent" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md p-4 flex flex-col justify-center items-center z-25 hidden">
+                        <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Aplikasi Terakhir</h3>
+                        
+                        <div id="recentCard" class="w-4/5 h-64 bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl flex flex-col overflow-hidden relative group">
+                            <div class="bg-slate-700 p-2 flex items-center justify-between text-xs">
+                                <span id="recentTitle" class="font-medium text-slate-200">Kalkulator</span>
+                                <i class="fas fa-times text-slate-400 cursor-pointer" onclick="closeRecentScreen()"></i>
+                            </div>
+                            <div id="recentPreview" class="flex-1 bg-slate-900 flex items-center justify-center text-slate-500 text-xs p-4 text-center">
+                                Pratinjau aplikasi aktif.
+                            </div>
+                            <button onclick="resumeRecentApp()" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-xs text-white font-medium">Buka Aplikasi</button>
+                        </div>
+                        
+                        <button onclick="closeRecentScreen()" class="mt-6 text-xs text-slate-400 hover:text-white bg-slate-800 px-4 py-1.5 rounded-full border border-slate-700">Tutup Semua</button>
+                    </div>
+
+                </div>
+
+                <!-- Android Bottom Navigation Bar (Pie Style) -->
+                <div id="navigationBar" class="h-10 bg-black/90 flex justify-around items-center px-8 z-40 border-t border-white/5">
+                    <!-- Back Button (Triangle) -->
+                    <button onclick="navBack()" class="w-10 h-8 flex items-center justify-center text-slate-400 active:text-white focus:outline-none transition-colors">
+                        <i class="fas fa-caret-left text-lg"></i>
+                    </button>
+                    <!-- Home Button (Pill / Circle) -->
+                    <button onclick="navHome()" class="w-10 h-8 flex items-center justify-center text-slate-400 active:text-white focus:outline-none transition-colors">
+                        <div class="w-3.5 h-3.5 border-2 border-current rounded-full"></div>
+                    </button>
+                    <!-- Recent Apps Button (Square) -->
+                    <button onclick="navRecent()" class="w-10 h-8 flex items-center justify-center text-slate-400 active:text-white focus:outline-none transition-colors">
+                        <div class="w-3 h-3 border-2 border-current rounded-sm"></div>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Right Side: Virtual CPU & ROM Controller Panel -->
+        <div class="w-full lg:w-80 flex flex-col gap-4">
+            <!-- Widget: C++ Virtual Core Status -->
+            <div id="c++-virtual-core" class="bg-slate-800/80 backdrop-blur border border-slate-700 p-4 rounded-2xl shadow-xl">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-bold text-cyan-400 flex items-center gap-2">
+                        <i class="fas fa-robot text-cyan-400"></i> 🤖 C++ Virtual Core Status
+                    </h2>
+                    <span id="cppCoreBadge" class="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full font-mono">STANDBY</span>
+                </div>
+                <div class="space-y-2 text-xs font-mono bg-slate-900/80 p-3 rounded-xl border border-slate-700">
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">Clock Speed:</span>
+                        <span class="text-cyan-300 font-bold">2.8 GHz</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">Alokasi RAM:</span>
+                        <span id="ramAllocText" class="text-cyan-300 font-bold">512 MB / 4096 MB</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-1.5 mt-1 overflow-hidden">
+                        <div id="ramBar" class="bg-cyan-400 h-1.5 rounded-full w-[12.5%] transition-all duration-300"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controller Emulator Panel -->
+            <div class="bg-slate-800/80 backdrop-blur border border-slate-700 p-4 rounded-2xl shadow-xl">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fas fa-microchip text-blue-400"></i> Controller Emulator
+                    </h2>
+                    <span id="cpuStatusBadge" class="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-mono">OFFLINE</span>
+                </div>
+
+                <div class="space-y-2 mb-3">
+                    <button onclick="togglePower()" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-98 text-white font-medium py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition">
+                        <i class="fas fa-power-off"></i> Tekan Tombol Power
+                    </button>
+                    <button onclick="resetEmulator()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition">
+                        <i class="fas fa-rotate-right"></i> Reboot System
+                    </button>
+                </div>
+
+                <!-- Toggle Key Mapping Button -->
+                <button id="toggleKeymapBtn" onclick="toggleKeyMapping()" class="w-full bg-slate-900 border border-yellow-500/50 hover:bg-yellow-500/10 text-yellow-400 font-medium py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition">
+                    <i class="fas fa-keyboard"></i> ⌨️ Aktifkan Key Mapping
+                </button>
+            </div>
+
+            <!-- Log Monitor Console -->
+            <div class="bg-slate-900 border border-slate-800 p-3 rounded-2xl shadow-xl flex flex-col h-64">
+                <div class="text-xs font-semibold text-slate-400 mb-2 flex items-center justify-between">
+                    <span><i class="fas fa-terminal text-emerald-400 mr-1"></i> CPU Register Log</span>
+                    <button onclick="clearConsoleLog()" class="text-[10px] text-slate-500 hover:text-slate-300">Clear</button>
+                </div>
+                <div id="systemLog" class="flex-1 font-mono text-[11px] text-slate-300 overflow-y-auto space-y-1.5 pr-1">
+                    <div id="cpu-log-element" class="space-y-1.5">
+                        <div class="text-slate-500">// Sistem siap. Tekan Power untuk booting.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /* ================= C++ VIRTUAL CORE PROCESSOR CLASS ================= */
+        class CppCoreProcessor {
+            constructor() {
+                this.clockSpeed = "2.8 GHz";
+                this.totalRamMB = 4096;
+                this.baseRamUsedMB = 512;
+                this.currentRamUsedMB = 512;
+                this.installedAppsRamMB = 0;
+            }
+
+            executeOp(instruction, details = "") {
+                this.updateRamUsage(instruction);
+                this.logRegisterInstruction(instruction, details);
+            }
+
+            addAppMemory(ramMB) {
+                this.installedAppsRamMB += ramMB;
+                this.updateRamUsage("APP_INSTALLED");
+            }
+
+            updateRamUsage(instruction) {
+                let dynamicRam = 0;
+                if (instruction.includes("BOOT") || instruction.includes("INIT")) dynamicRam = 256;
+                else if (instruction.includes("CALC")) dynamicRam = 64;
+                else if (instruction.includes("YOUTUBE")) dynamicRam = 384;
+                else if (instruction.includes("PLAYSTORE")) dynamicRam = 300;
+                else if (instruction.includes("POWER_OFF")) {
+                    this.currentRamUsedMB = this.baseRamUsedMB;
+                    this.installedAppsRamMB = 0;
+                    this.renderUI();
+                    return;
+                } else {
+                    dynamicRam = 128;
+                }
+
+                this.currentRamUsedMB = Math.min(this.totalRamMB, this.baseRamUsedMB + dynamicRam + this.installedAppsRamMB + Math.floor(Math.random() * 16));
+                this.renderUI();
+            }
+
+            renderUI() {
+                const ramText = document.getElementById('ramAllocText');
+                const ramBar = document.getElementById('ramBar');
+                const badge = document.getElementById('cppCoreBadge');
+
+                if (ramText) ramText.innerText = `${this.currentRamUsedMB} MB / ${this.totalRamMB} MB`;
+                if (ramBar) {
+                    const percent = (this.currentRamUsedMB / this.totalRamMB) * 100;
+                    ramBar.style.width = `${percent}%`;
+                }
+                if (badge) {
+                    if (isPowerOn) {
+                        badge.innerText = "ACTIVE";
+                        badge.className = "text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full font-mono";
+                    } else {
+                        badge.innerText = "STANDBY";
+                        badge.className = "text-[10px] bg-slate-500/20 text-slate-400 px-2 py-0.5 rounded-full font-mono";
+                    }
+                }
+            }
+
+            logRegisterInstruction(opcode, detail) {
+                const logContainer = document.getElementById('cpu-log-element') || document.getElementById('systemLog');
+                if (!logContainer) return;
+
+                const time = new Date().toLocaleTimeString('id-ID', { hour12: false });
+                const entry = document.createElement('div');
+                entry.style.color = '#00d2ff';
+                entry.innerHTML = `<span class="text-slate-500">[${time}]</span> [C++ ALU] ${opcode}: ${detail}`;
+                
+                logContainer.appendChild(entry);
+                const parent = document.getElementById('systemLog');
+                if (parent) parent.scrollTop = parent.scrollHeight;
+            }
+        }
+
+        const cppCore = new CppCoreProcessor();
+
+        /* ================= 1. VIRTUAL CPU & ROM DEFINITION ================= */
+        const ROM_ANDROID_9 = [
+            { opcode: 0x01, desc: "EXEC 0x01: Booting Kernel Linux v4.19.81...", state: "KERNEL" },
+            { opcode: 0x02, desc: "EXEC 0x02: Mount System Partition (Android 9 Pie)...", state: "SYSTEM" },
+            { opcode: 0x03, desc: "EXEC 0x03: Starting Zygote & Android Runtime (ART)...", state: "ART" },
+            { opcode: 0x04, desc: "EXEC 0x04: Initializing SurfaceFlinger & System UI...", state: "UI" },
+            { opcode: 0x00, desc: "EXEC 0x00: System Ready. Launching Launcher3 Home Screen.", state: "READY" }
+        ];
+
+        class CPUVirtual {
+            constructor() {
+                this.pc = 0;
+                this.isRunning = false;
+            }
+
+            reset() {
+                this.pc = 0;
+                this.isRunning = false;
+            }
+        }
+
+        const cpu = new CPUVirtual();
+        let isPowerOn = false;
+        let bootInterval = null;
+        let activeAppId = null;
+        let lastActiveAppId = null;
+        let isKeymapActive = false;
+
+        /* ================= 2. POWER & BOOTING SYSTEM ================= */
+        document.getElementById('powerButton').addEventListener('click', togglePower);
+
+        function togglePower() {
+            if (!isPowerOn) {
+                turnOnEmulator();
+            } else {
+                turnOffEmulator();
+            }
+        }
+
+        function turnOnEmulator() {
+            isPowerOn = true;
+            document.getElementById('cpuStatusBadge').className = "text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-mono";
+            document.getElementById('cpuStatusBadge').innerText = "BOOTING";
+            
+            showScreen('screenBooting');
+            document.getElementById('bootProgress').style.width = '0%';
+            document.getElementById('bootLogs').innerHTML = '';
+            
+            logSystem("[POWER] Memulai sinyal daya ke CPUVirtual.");
+            cppCore.executeOp("SYS_POWER_ON", "RegPOWER -> HIGH (1)");
+            cpu.reset();
+            cpu.isRunning = true;
+
+            let step = 0;
+            const totalSteps = ROM_ANDROID_9.length;
+
+            bootInterval = setInterval(() => {
+                if (step < totalSteps) {
+                    const instr = ROM_ANDROID_9[step];
+                    const progress = ((step + 1) / totalSteps) * 100;
+                    document.getElementById('bootProgress').style.width = `${progress}%`;
+                    
+                    const logEntry = document.createElement('div');
+                    logEntry.innerText = `> ${instr.desc}`;
+                    document.getElementById('bootLogs').appendChild(logEntry);
+                    document.getElementById('bootLogs').scrollTop = document.getElementById('bootLogs').scrollHeight;
+
+                    logSystem(instr.desc);
+                    cppCore.executeOp(`OP_BOOT_STEP_${step}`, `RegROM[0x0${instr.opcode}] -> Executed`);
+                    step++;
+                } else {
+                    clearInterval(bootInterval);
+                    finishBooting();
+                }
+            }, 800);
+        }
+
+        function finishBooting() {
+            document.getElementById('cpuStatusBadge').className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono";
+            document.getElementById('cpuStatusBadge').innerText = "ONLINE";
+            logSystem("[SYSTEM] Boot selesai. Android 9 Pie siap digunakan.");
+            cppCore.executeOp("SYS_BOOT_COMPLETE", "RegSTATUS -> READY_STATE");
+            showScreen('screenHome');
+            activeAppId = null;
+        }
+
+        function turnOffEmulator() {
+            if (bootInterval) clearInterval(bootInterval);
+            isPowerOn = false;
+            cpu.reset();
+            showScreen('screenOff');
+            
+            document.getElementById('cpuStatusBadge').className = "text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-mono";
+            document.getElementById('cpuStatusBadge').innerText = "OFFLINE";
+            logSystem("[POWER] Sistem dimatikan.");
+            cppCore.executeOp("OP_POWER_OFF", "RegPOWER -> LOW (0)");
+        }
+
+        function resetEmulator() {
+            logSystem("[REBOOT] Memulai ulang emulator...");
+            cppCore.executeOp("OP_SYS_RESET", "RegRESET -> SIGNAL_TRIGGER");
+            turnOffEmulator();
+            setTimeout(() => {
+                turnOnEmulator();
+            }, 600);
+        }
+
+        /* ================= 3. SCREEN SWITCHER & NAVIGATION ================= */
+        function showScreen(screenId) {
+            const screens = ['screenOff', 'screenBooting', 'screenHome', 'appCalculator', 'appSettings', 'appNotes', 'appYoutube', 'appPlaystore', 'appGeneric', 'screenRecent'];
+            screens.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (id === screenId) {
+                        el.classList.remove('hidden');
+                    } else {
+                        el.classList.add('hidden');
+                    }
+                }
+            });
+        }
+
+        function openApp(appId) {
+            if (!isPowerOn) return;
+            activeAppId = appId;
+            lastActiveAppId = appId;
+            showScreen(appId);
+            logSystem(`[LAUNCH] Membuka aplikasi: ${appId.replace('app', '')}`);
+            cppCore.executeOp("OP_APP_LAUNCH", `RegAPP -> ${appId.toUpperCase()}`);
+        }
+
+        function navHome() {
+            if (!isPowerOn) return;
+            activeAppId = null;
+            showScreen('screenHome');
+            logSystem("[NAV] Tombol Home ditekan.");
+            cppCore.executeOp("OP_NAV_HOME", "RegUI -> LAUNCHER_HOME");
+        }
+
+        function navBack() {
+            if (!isPowerOn) return;
+            if (activeAppId) {
+                activeAppId = null;
+                showScreen('screenHome');
+                logSystem("[NAV] Kembali ke Home Screen.");
+                cppCore.executeOp("OP_NAV_BACK", "RegUI -> POP_STACK");
+            } else {
+                logSystem("[NAV] Tombol Back ditekan di Home Screen.");
+                cppCore.executeOp("OP_NAV_BACK", "RegUI -> NO_OP");
+            }
+        }
+
+        function navRecent() {
+            if (!isPowerOn) return;
+            if (lastActiveAppId) {
+                const titleMap = {
+                    'appCalculator': 'Kalkulator',
+                    'appSettings': 'Pengaturan',
+                    'appNotes': 'Catatan',
+                    'appYoutube': 'YouTube',
+                    'appPlaystore': 'Play Store',
+                    'appGeneric': 'Aplikasi Terpasang'
+                };
+                document.getElementById('recentTitle').innerText = titleMap[lastActiveAppId] || 'Aplikasi';
+                document.getElementById('recentPreview').innerText = `Aplikasi ${titleMap[lastActiveAppId] || ''} sedang berjalan di latar belakang.`;
+                showScreen('screenRecent');
+                logSystem("[NAV] Menampilkan Recent Apps.");
+                cppCore.executeOp("OP_NAV_RECENT", "RegUI -> SHOW_RECENT");
+            } else {
+                logSystem("[NAV] Tidak ada aplikasi terbaru.");
+                cppCore.executeOp("OP_NAV_RECENT", "RegUI -> EMPTY_STACK");
+            }
+        }
+
+        function closeRecentScreen() {
+            showScreen('screenHome');
+            cppCore.executeOp("OP_RECENT_CLOSE", "RegUI -> LAUNCHER_HOME");
+        }
+
+        function resumeRecentApp() {
+            if (lastActiveAppId) {
+                openApp(lastActiveAppId);
+            }
+        }
+
+        /* ================= 4. KEYBOARD MAPPING FEATURE ================= */
+        function toggleKeyMapping() {
+            isKeymapActive = !isKeymapActive;
+            const btn = document.getElementById('toggleKeymapBtn');
+            const overlay = document.getElementById('keyMapOverlay');
+            const badges = document.querySelectorAll('.keymap-badge');
+
+            if (isKeymapActive) {
+                btn.className = "w-full bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition";
+                overlay.classList.remove('hidden');
+                badges.forEach(b => b.classList.remove('hidden'));
+                logSystem("[KEYBOARD MAP] Mode Key Mapping Diaktifkan.");
+                cppCore.executeOp("KEYMAP_ENABLE", "RegKEY -> HOOK_ACTIVE");
+            } else {
+                btn.className = "w-full bg-slate-900 border border-yellow-500/50 hover:bg-yellow-500/10 text-yellow-400 font-medium py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition";
+                overlay.classList.add('hidden');
+                badges.forEach(b => b.classList.add('hidden'));
+                logSystem("[KEYBOARD MAP] Mode Key Mapping Dimatikan.");
+                cppCore.executeOp("KEYMAP_DISABLE", "RegKEY -> HOOK_INACTIVE");
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (!isPowerOn || !isKeymapActive) return;
+            
+            // Mengabaikan input ketika pengguna mengetik pada input field
+            const activeTag = document.activeElement ? document.activeElement.tagName : '';
+            if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return;
+
+            const key = e.key.toUpperCase();
+            if (key === 'K') {
+                logSystem("[KEYBOARD MAP] Interupsi Hardware: Tombol 'K' mendeteksi input -> Membuka Kalkulator");
+                cppCore.executeOp("OP_KEYMAP_K", "RegIRQ -> TRIGGER_APP_CALC");
+                openApp('appCalculator');
+            } else if (key === 'Y') {
+                logSystem("[KEYBOARD MAP] Interupsi Hardware: Tombol 'Y' mendeteksi input -> Membuka YouTube");
+                cppCore.executeOp("OP_KEYMAP_Y", "RegIRQ -> TRIGGER_APP_YOUTUBE");
+                openApp('appYoutube');
+            } else if (key === 'P') {
+                logSystem("[KEYBOARD MAP] Interupsi Hardware: Tombol 'P' mendeteksi input -> Membuka Play Store");
+                cppCore.executeOp("OP_KEYMAP_P", "RegIRQ -> TRIGGER_APP_PLAYSTORE");
+                openApp('appPlaystore');
+            } else if (key === 'S') {
+                logSystem("[KEYBOARD MAP] Interupsi Hardware: Tombol 'S' mendeteksi input -> Membuka Pengaturan");
+                cppCore.executeOp("OP_KEYMAP_S", "RegIRQ -> TRIGGER_APP_SETTINGS");
+                openApp('appSettings');
+            } else if (key === 'N') {
+                logSystem("[KEYBOARD MAP] Interupsi Hardware: Tombol 'N' mendeteksi input -> Membuka Catatan");
+                cppCore.executeOp("OP_KEYMAP_N", "RegIRQ -> TRIGGER_APP_NOTES");
+                openApp('appNotes');
+            }
+        });
+
+        /* ================= 5. GOOGLE PLAY STORE INSTALLATION LOGIC ================= */
+        const installedAppsMap = {};
+
+        function installApp(appKey, appName, iconClass, bgClass, ramUsageMB) {
+            if (installedAppsMap[appKey]) {
+                openGenericApp(appName, iconClass, bgClass);
+                return;
+            }
+
+            const btnId = 'btnInstall' + appKey.charAt(0).toUpperCase() + appKey.slice(1);
+            const progressId = 'progress' + appKey.charAt(0).toUpperCase() + appKey.slice(1);
+            const barId = 'bar' + appKey.charAt(0).toUpperCase() + appKey.slice(1);
+
+            const btn = document.getElementById(btnId);
+            const progressEl = document.getElementById(progressId);
+            const barEl = document.getElementById(barId);
+
+            if (!btn || !progressEl || !barEl) return;
+
+            btn.disabled = true;
+            btn.innerText = "Mengunduh...";
+            btn.className = "bg-slate-700 text-slate-400 text-xs px-3 py-1.5 rounded-lg font-medium cursor-not-allowed";
+            progressEl.classList.remove('hidden');
+            
+            logSystem(`[PLAY STORE] Mengunduh paket aplikasi: ${appName}...`);
+            cppCore.executeOp("OP_APK_DOWNLOAD", `RegNET -> FETCH_${appKey.toUpperCase()}_APK`);
+
+            let pct = 0;
+            const interval = setInterval(() => {
+                pct += 20;
+                barEl.style.width = `${pct}%`;
+
+                if (pct >= 100) {
+                    clearInterval(interval);
+                    installedAppsMap[appKey] = { name: appName, icon: iconClass, bg: bgClass, ram: ramUsageMB };
+
+                    btn.disabled = false;
+                    btn.innerText = "Buka";
+                    btn.className = "bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition";
+                    progressEl.classList.add('hidden');
+
+                    // Menambahkan Ikon Baru ke Home Screen
+                    addAppToHomeScreen(appKey, appName, iconClass, bgClass);
+
+                    logSystem(`[PLAY STORE] Aplikasi ${appName} sukses terpasang!`);
+                    cppCore.addAppMemory(ramUsageMB);
+                    cppCore.executeOp("OP_APK_INSTALL", `RegFS -> WRITE_${appKey.toUpperCase()}_BIN (${ramUsageMB}MB)`);
+
+                    btn.onclick = () => openGenericApp(appName, iconClass, bgClass);
+                }
+            }, 300);
+        }
+
+        function addAppToHomeScreen(appKey, appName, iconClass, bgClass) {
+            const grid = document.getElementById('homeAppGrid');
+            if (!grid) return;
+
+            const newAppBtn = document.createElement('button');
+            newAppBtn.className = "relative flex flex-col items-center gap-1.5 group focus:outline-none";
+            newAppBtn.onclick = () => openGenericApp(appName, iconClass, bgClass);
+
+            const badgeDisplay = isKeymapActive ? '' : 'hidden';
+
+            newAppBtn.innerHTML = `
+                <span class="key-badge keymap-badge ${badgeDisplay}">★</span>
+                <div class="w-14 h-14 ${bgClass} rounded-2xl flex items-center justify-center shadow-lg group-active:scale-95 transition-transform">
+                    <i class="fas ${iconClass} text-2xl text-white"></i>
+                </div>
+                <span class="text-[11px] text-white font-medium drop-shadow truncate w-16 text-center">${appName}</span>
+            `;
+
+            grid.appendChild(newAppBtn);
+        }
+
+        function openGenericApp(appName, iconClass, bgClass) {
+            document.getElementById('genericAppTitle').innerText = appName;
+            document.getElementById('genericAppName').innerText = appName;
+            
+            const iconContainer = document.getElementById('genericAppIcon');
+            iconContainer.className = `w-20 h-20 rounded-3xl flex items-center justify-center text-4xl text-white shadow-2xl mb-4 ${bgClass}`;
+            iconContainer.innerHTML = `<i class="fas ${iconClass}"></i>`;
+
+            openApp('appGeneric');
+        }
+
+        /* ================= 6. GOOGLE SEARCH BAR INTEGRATION ================= */
+        function handleGoogleSearchKeyDown(event) {
+            if (event.key === 'Enter') {
+                executeGoogleSearch();
+            }
+        }
+
+        function executeGoogleSearch() {
+            if (!isPowerOn) return;
+            const input = document.getElementById('googleSearchInput');
+            const keyword = input.value.trim();
+
+            if (!keyword) return;
+
+            logSystem(`[GOOGLE SEARCH] Mencari: "${keyword}" -> Dialihkan ke YouTube`);
+            cppCore.executeOp("OP_SEARCH_EXEC", `RegBUS -> "${keyword}"`);
+
+            let targetVideoId = keyword;
+            if (keyword.includes('v=')) {
+                targetVideoId = keyword.split('v=')[1].split('&')[0];
+            } else if (keyword.includes('youtu.be/')) {
+                targetVideoId = keyword.split('youtu.be/')[1].split('?')[0];
+            } else if (keyword.toLowerCase().includes('rick')) {
+                targetVideoId = 'dQw4w9WgXcQ';
+            } else if (keyword.toLowerCase().includes('bunny')) {
+                targetVideoId = 'aqz-KE-bpKQ';
+            }
+
+            openApp('appYoutube');
+            gantiVideoYouTube(targetVideoId, `Hasil Cari: "${keyword}"`);
+            
+            input.value = '';
+        }
+
+        /* ================= 7. YOUTUBE APP FUNCTIONS ================= */
+        function gantiVideoYouTube(idVideo, judul) {
+            const iframe = document.getElementById('ytIframe');
+            iframe.src = `https://www.youtube.com/embed/${idVideo}?enablejsapi=1&origin=https://localhost&rel=0&hl=id`;
+            
+            document.getElementById('ytCurrentTitle').innerText = `Memutar: ${judul}`;
+            document.getElementById('ytSearchInput').value = idVideo;
+            
+            logSystem(`[YOUTUBE] Memutar video: [${idVideo}] - ${judul}`);
+            cppCore.executeOp("OP_YOUTUBE_LOAD", `RegVID -> "${idVideo}"`);
+        }
+
+        function putarVideoInputManual() {
+            const inputVal = document.getElementById('ytSearchInput').value.trim();
+            if (!inputVal) return;
+
+            let videoId = inputVal;
+            if (inputVal.includes('v=')) {
+                videoId = inputVal.split('v=')[1].split('&')[0];
+            } else if (inputVal.includes('youtu.be/')) {
+                videoId = inputVal.split('youtu.be/')[1].split('?')[0];
+            }
+
+            gantiVideoYouTube(videoId, `Video ID: ${videoId}`);
+        }
+
+        /* ================= 8. APPLICATION: CALCULATOR LOGIC ================= */
+        let calcCurrentInput = '';
+
+        function calcInput(char) {
+            if (calcCurrentInput === 'Error') calcCurrentInput = '';
+            calcCurrentInput += char;
+            document.getElementById('calcDisplay').innerText = calcCurrentInput;
+            cppCore.executeOp("OP_CALC_PUSH", `RegA -> '${char}'`);
+        }
+
+        function calcClearAll() {
+            calcCurrentInput = '';
+            document.getElementById('calcDisplay').innerText = '0';
+            document.getElementById('calcExpr').innerText = '';
+            cppCore.executeOp("OP_CALC_CLEAR", "RegA -> 0, RegB -> 0");
+        }
+
+        function calcBackspace() {
+            if (calcCurrentInput === 'Error') {
+                calcClearAll();
+                return;
+            }
+            calcCurrentInput = calcCurrentInput.slice(0, -1);
+            document.getElementById('calcDisplay').innerText = calcCurrentInput || '0';
+            cppCore.executeOp("OP_CALC_POP", "RegA -> SHIFT_RIGHT");
+        }
+
+        function calcToggleSign() {
+            if (!calcCurrentInput || calcCurrentInput === 'Error') return;
+            if (calcCurrentInput.startsWith('-')) {
+                calcCurrentInput = calcCurrentInput.substring(1);
+            } else {
+                calcCurrentInput = '-' + calcCurrentInput;
+            }
+            document.getElementById('calcDisplay').innerText = calcCurrentInput;
+            cppCore.executeOp("OP_CALC_NEG", "RegA -> RegA * -1");
+        }
+
+        function calcEquals() {
+            try {
+                if (!calcCurrentInput || calcCurrentInput === 'Error') return;
+                let parsedExpr = calcCurrentInput.replace(/%/g, '/100');
+                document.getElementById('calcExpr').innerText = calcCurrentInput + ' =';
+                const result = Function(`'use strict'; return (${parsedExpr})`)();
+                document.getElementById('calcDisplay').innerText = result;
+                
+                cppCore.executeOp("OP_CALC_EVAL", `RegA [${calcCurrentInput}] -> Output [${result}]`);
+                calcCurrentInput = result.toString();
+            } catch (e) {
+                document.getElementById('calcDisplay').innerText = 'Error';
+                calcCurrentInput = 'Error';
+                cppCore.executeOp("OP_CALC_ERR", "RegFLAG -> OVERFLOW_EXCEPT");
+            }
+        }
+
+        /* ================= 9. APPLICATION: SETTINGS LOGIC ================= */
+        function changeBrightness(val) {
+            document.getElementById('brightnessValText').innerText = `${val}%`;
+            const phoneScreen = document.getElementById('phoneScreen');
+            phoneScreen.style.filter = `brightness(${val}%)`;
+            cppCore.executeOp("OP_SET_BRIGHTNESS", `RegPWM -> ${val}%`);
+        }
+
+        function handleWifiToggle(el) {
+            const statusText = document.getElementById('wifiStatusText');
+            const wifiIcon = document.getElementById('statusWifi');
+            if (el.checked) {
+                statusText.innerText = 'Terhubung ke Virtual_Net';
+                wifiIcon.style.opacity = '1';
+                logSystem("[SETTINGS] Wi-Fi diaktifkan.");
+                cppCore.executeOp("OP_NET_WIFI", "RegWIFI -> ENABLED (1)");
+            } else {
+                statusText.innerText = 'Mati';
+                wifiIcon.style.opacity = '0.3';
+                logSystem("[SETTINGS] Wi-Fi dimatikan.");
+                cppCore.executeOp("OP_NET_WIFI", "RegWIFI -> DISABLED (0)");
+            }
+        }
+
+        function handleBtToggle(el) {
+            const statusText = document.getElementById('btStatusText');
+            if (el.checked) {
+                statusText.innerText = 'Aktif & Memindai...';
+                logSystem("[SETTINGS] Bluetooth diaktifkan.");
+                cppCore.executeOp("OP_NET_BT", "RegBT -> SCANNING");
+            } else {
+                statusText.innerText = 'Mati';
+                logSystem("[SETTINGS] Bluetooth dimatikan.");
+                cppCore.executeOp("OP_NET_BT", "RegBT -> DISABLED");
+            }
+        }
+
+        /* ================= 10. APPLICATION: NOTES LOGIC ================= */
+        function saveNote() {
+            const title = document.getElementById('noteTitle').value.trim();
+            const body = document.getElementById('noteBody').value.trim();
+
+            if (!title && !body) {
+                document.getElementById('noteStatus').innerText = 'Catatan kosong!';
+                return;
+            }
+
+            const noteData = { title, body, date: new Date().toLocaleTimeString() };
+            localStorage.setItem('android_9_emulator_note', JSON.stringify(noteData));
+            
+            document.getElementById('noteStatus').innerText = 'Tersimpan!';
+            logSystem("[NOTES] Catatan disimpan.");
+            cppCore.executeOp("OP_IO_WRITE", "RegNAND -> WRITE_BLOCK");
+            setTimeout(() => {
+                document.getElementById('noteStatus').innerText = '';
+            }, 2500);
+        }
+
+        function loadSavedNote() {
+            const saved = localStorage.getItem('android_9_emulator_note');
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    document.getElementById('noteTitle').value = data.title || '';
+                    document.getElementById('noteBody').value = data.body || '';
+                } catch (e) {}
+            }
+        }
+
+        function clearNote() {
+            document.getElementById('noteTitle').value = '';
+            document.getElementById('noteBody').value = '';
+            localStorage.removeItem('android_9_emulator_note');
+            document.getElementById('noteStatus').innerText = 'Catatan dihapus.';
+            cppCore.executeOp("OP_IO_DELETE", "RegNAND -> ERASE_BLOCK");
+            setTimeout(() => {
+                document.getElementById('noteStatus').innerText = '';
+            }, 2000);
+        }
+
+        /* ================= 11. SYSTEM UTILITIES & CLOCK ================= */
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const timeString = `${hours}:${minutes}`;
+
+            document.getElementById('statusTime').innerText = timeString;
+            document.getElementById('widgetTime').innerText = timeString;
+
+            const options = { weekday: 'long', day: 'numeric', month: 'long' };
+            document.getElementById('widgetDate').innerText = now.toLocaleDateString('id-ID', options);
+        }
+
+        function logSystem(msg) {
+            const consoleEl = document.getElementById('cpu-log-element') || document.getElementById('systemLog');
+            if (!consoleEl) return;
+            const entry = document.createElement('div');
+            const time = new Date().toLocaleTimeString('id-ID', { hour12: false });
+            entry.innerHTML = `<span class="text-slate-500">[${time}]</span> ${msg}`;
+            consoleEl.appendChild(entry);
+            
+            const parent = document.getElementById('systemLog');
+            if (parent) parent.scrollTop = parent.scrollHeight;
+        }
+
+        function clearConsoleLog() {
+            const consoleEl = document.getElementById('cpu-log-element');
+            if (consoleEl) {
+                consoleEl.innerHTML = '';
+            } else {
+                document.getElementById('systemLog').innerHTML = '';
+            }
+        }
+
+        // Inisialisasi Jam Realtime & Catatan Tersimpan
+        setInterval(updateClock, 1000);
+        updateClock();
+        loadSavedNote();
+    </script>
+</body>
+</html>
